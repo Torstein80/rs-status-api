@@ -1,6 +1,6 @@
 services:
   rs-status-api:
-    image: ghcr.io/YOUR_GITHUB_USERNAME/rs-status-api:latest
+    image: ghcr.io/Torstein80/rs-status-api:latest
     container_name: rs-status-api
     restart: unless-stopped
     environment:
