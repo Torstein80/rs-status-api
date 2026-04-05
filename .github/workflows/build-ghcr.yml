@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: Torstein80/rs-status-api
+  IMAGE_NAME: torstein80/rs-status-api
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
