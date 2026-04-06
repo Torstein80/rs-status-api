@@ -4,8 +4,10 @@ services:
     container_name: rs-status-api
     restart: unless-stopped
     environment:
-      RS_ID: ${RS_ID:-127}
-      RS_NAME: ${RS_NAME:-Anne-Lise}
+      VESSEL_MMSI: ${VESSEL_MMSI:-257246500}
+      # Optional fallbacks if you do not want to use MMSI:
+      # RS_ID: ${RS_ID:-103}
+      # RS_NAME: ${RS_NAME:-RS 103 "Dagfinn Paust"}
       LISTEN_HOST: 0.0.0.0
       LISTEN_PORT: 8080
       CACHE_SECONDS: 120
@@ -19,3 +21,25 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+# services:
+#   rs-status-api:
+#     image: ghcr.io/torstein80/rs-status-api:latest
+#     container_name: rs-status-api
+#     restart: unless-stopped
+#     environment:
+#       RS_ID: ${RS_ID:-127}
+#       RS_NAME: ${RS_NAME:-Anne-Lise}
+#       LISTEN_HOST: 0.0.0.0
+#       LISTEN_PORT: 8080
+#       CACHE_SECONDS: 120
+#       REQUEST_TIMEOUT: 20
+#       TZ: Europe/Oslo
+#     ports:
+#       - "8080:8080"
+#     healthcheck:
+#       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
+#       interval: 30s
+#       timeout: 10s
+#       retries: 3
+#       start_period: 10s
