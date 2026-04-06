@@ -4,19 +4,20 @@ services:
     container_name: rs-status-api
     restart: unless-stopped
     environment:
-      VESSEL_MMSI: ${VESSEL_MMSI:-}
-      RS_ID: ${RS_ID:-127}
-      RS_NAME: ${RS_NAME:-Anne-Lise}
-      STATUS_HISTORY_FILE: /data/status_text_history.json
+      VESSEL_MMSI: "257895900" # RS 127 "Anne-Lise"
       LISTEN_HOST: 0.0.0.0
       LISTEN_PORT: 8080
       CACHE_SECONDS: 120
       REQUEST_TIMEOUT: 20
+      STATUS_HISTORY_FILE: /data/status_text_history.json
       TZ: Europe/Oslo
-    volumes:
-      - rs-status-data:/data
+      # Optional fallback selectors if you do not want to use MMSI:
+      # RS_ID: "127"
+      # RS_NAME: "Anne-Lise"
     ports:
       - "8080:8080"
+    volumes:
+      - rs-status-api-data:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
       interval: 30s
@@ -25,4 +26,4 @@ services:
       start_period: 10s
 
 volumes:
-  rs-status-data:
+  rs-status-api-data:

@@ -1,6 +1,6 @@
 # RS status API for Home Assistant
 
-This image exposes vessel status from the RS feed over a small HTTP API so it can be consumed by Home Assistant or other systems.
+This container exposes vessel status from the RS feed over a small HTTP API so it can be consumed by Home Assistant or other systems.
 
 It is intended for users who already have:
 
@@ -10,38 +10,41 @@ It is intended for users who already have:
 
 The API exposes:
 
-- `/status` - current status for one selected vessel
-- `/status-texts` - duplicate-free list of all unique live `StatusText` values this service has ever seen
+- `/status` - status for the selected vessel as JSON
+- `/status-texts` - duplicate-free list of all unique `status_text` values this running service has ever seen
 - `/healthz` - health and cache information
 
 ---
 
 ## What this container does
 
-The service fetches vessel data from the upstream RS API, normalizes the selected vessel status text, and returns JSON like this:
+The service fetches vessel data from the upstream RS API, selects one vessel, normalizes the status fields, and returns a compact JSON response.
+
+By default, vessel selection should be done by MMSI.
+The current stack file is preconfigured for **RS 127 "Anne-Lise"** using **MMSI `257895900`**.
+
+Example `/status` response:
 
 ```json
 {
   "ok": true,
   "rs": "127",
-  "name": "Anne-Lise",
-  "mmsi": "257123456",
-  "raw_status": "Ledig, på basen/patrulje",
-  "status": "Ledig, på basen/patrulje",
-  "status_text": "Ledig, på basen/patrulje",
-  "state_description": "Operativ",
-  "station": "...",
-  "timestamp": "...",
-  "source": "...",
-  "served_at": "...",
+  "name": "RS 127 \"Anne-Lise\"",
+  "mmsi": "257895900",
+  "raw_status": "30 min beredskap",
+  "status": "30 min beredskap",
+  "status_text": "30 min beredskap",
+  "state_description": "Beredskap",
+  "station": "Lillesand",
+  "timestamp": "2026-04-06T18:56:06.000Z",
+  "source": "https://prod-rsfeed-xml2json-proxy.rs-marine-services.rs.no/prefetch/getboats",
+  "served_at": "2026-04-06T20:00:00+00:00",
   "stale": false
 }
 ```
 
 The app does **not** poll continuously.
-It fetches upstream data only when one of the HTTP endpoints is requested, and then caches the fleet for a short period.
-
-The `/status-texts` endpoint builds a growing history of unique `extendedState.StatusText` values over time, without duplicates. The history is saved to disk so it can survive container restarts when `/data` is persisted.
+It only fetches upstream data when `/status`, `/status-texts`, or `/healthz` is requested, and then caches the upstream response for a short period.
 
 ---
 
@@ -62,18 +65,18 @@ The following environment variables are supported:
 | Variable | Required | Default | Description |
 |---|---:|---|---|
 | `VESSEL_MMSI` | No | empty | Preferred vessel selector |
-| `RS_ID` | No | `127` | Fallback rescue vessel ID |
-| `RS_NAME` | No | `Anne-Lise` | Fallback vessel name |
-| `STATUS_HISTORY_FILE` | No | `/data/status_text_history.json` | Where seen `StatusText` history is stored |
+| `RS_ID` | No | `127` | Optional fallback vessel selector |
+| `RS_NAME` | No | `Anne-Lise` | Optional fallback vessel selector |
 | `LISTEN_HOST` | No | `0.0.0.0` | Bind address inside the container |
 | `LISTEN_PORT` | No | `8080` | HTTP port inside the container |
 | `CACHE_SECONDS` | No | `120` | Cache lifetime before a new upstream fetch |
 | `REQUEST_TIMEOUT` | No | `20` | Timeout in seconds for upstream requests |
+| `STATUS_HISTORY_FILE` | No | `/data/status_text_history.json` | Persistent file used by `/status-texts` |
 | `TZ` | No | `Europe/Oslo` | Container time zone |
 
-In normal use, you usually only need to set `VESSEL_MMSI`.
+In normal use, you usually only need to set:
 
-If `VESSEL_MMSI` is not set, the app falls back to `RS_ID`, then `RS_NAME`.
+- `VESSEL_MMSI`
 
 ---
 
@@ -101,19 +104,20 @@ services:
     container_name: rs-status-api
     restart: unless-stopped
     environment:
-      VESSEL_MMSI: ${VESSEL_MMSI:-}
-      RS_ID: ${RS_ID:-127}
-      RS_NAME: ${RS_NAME:-Anne-Lise}
-      STATUS_HISTORY_FILE: /data/status_text_history.json
+      VESSEL_MMSI: "257895900" # RS 127 "Anne-Lise"
       LISTEN_HOST: 0.0.0.0
       LISTEN_PORT: 8080
       CACHE_SECONDS: 120
       REQUEST_TIMEOUT: 20
+      STATUS_HISTORY_FILE: /data/status_text_history.json
       TZ: Europe/Oslo
-    volumes:
-      - rs-status-data:/data
+      # Optional fallback selectors if you do not want to use MMSI:
+      # RS_ID: "127"
+      # RS_NAME: "Anne-Lise"
     ports:
       - "8080:8080"
+    volumes:
+      - rs-status-api-data:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
       interval: 30s
@@ -122,33 +126,20 @@ services:
       start_period: 10s
 
 volumes:
-  rs-status-data:
+  rs-status-api-data:
 ```
 
 ### 3. Set environment variables in Portainer
 
-Before deploying the stack, set these variables in the Portainer UI if you want a vessel other than the defaults.
+The included stack already targets **RS 127 "Anne-Lise"**.
 
-Find the available rescue vessels and their MMSI values here:
-
-```text
-https://aistracker.rs.no/#/
-```
-
-Recommended:
+If you want to track another vessel, replace:
 
 ```text
-VESSEL_MMSI=257123456
+VESSEL_MMSI=257895900
 ```
 
-Optional fallbacks:
-
-```text
-RS_ID=127
-RS_NAME=Anne-Lise
-```
-
-You can keep the fallback defaults and deploy immediately, but MMSI is the preferred selector.
+with the MMSI for the vessel you want.
 
 ### 4. Deploy the stack
 
@@ -213,30 +204,9 @@ curl http://YOUR_CONTAINER_IP:8080/status-texts
 
 Expected behavior:
 
-- `/healthz` returns health and cache info
-- `/status` returns one vessel in JSON
-- `/status-texts` returns the accumulated, duplicate-free history of unique `StatusText` values observed by the service
-
----
-
-## Choosing a vessel
-
-The service selects the vessel in this order:
-
-1. `?mmsi=` query parameter
-2. `VESSEL_MMSI`
-3. `?rs=` query parameter
-4. `RS_ID`
-5. `?name=` query parameter
-6. `RS_NAME`
-
-Examples:
-
-```bash
-curl "http://YOUR_CONTAINER_IP:8080/status?mmsi=257123456"
-curl "http://YOUR_CONTAINER_IP:8080/status?rs=127"
-curl "http://YOUR_CONTAINER_IP:8080/status?name=Anne-Lise"
-```
+- `/healthz` returns JSON with cache and history info
+- `/status` returns vessel data in JSON
+- `/status-texts` returns a persistent duplicate-free list of all seen `status_text` values
 
 ---
 
@@ -280,53 +250,30 @@ Replace `YOUR_CONTAINER_IP` with the IP address or hostname of the Docker host r
 
 ---
 
-## Why the `/status-texts` history matters
-
-The live RS feed only shows the statuses that are present right now.
-
-This service keeps a duplicate-free list of statuses it has seen over time, so if a status appears later, it will be added automatically and remembered.
-
-Each entry includes:
-
-- `status_text`
-- `first_seen`
-- `last_seen`
-- `seen_count`
-
-Example:
-
-```json
-{
-  "ok": true,
-  "count": 3,
-  "status_texts": [
-    "Ledig, på basen/patrulje",
-    "30 min beredskap",
-    "UAD"
-  ],
-  "items": [
-    {
-      "status_text": "Ledig, på basen/patrulje",
-      "first_seen": "2026-04-06T19:40:00+00:00",
-      "last_seen": "2026-04-06T21:10:00+00:00",
-      "seen_count": 14
-    }
-  ]
-}
-```
-
----
-
 ## Changing vessel later
 
 To track a different vessel:
 
 1. Open the stack in Portainer
 2. Edit the stack
-3. Change `VESSEL_MMSI` or one of the fallback selectors
+3. Change `VESSEL_MMSI`
 4. Redeploy the stack
 
 You do **not** need to rebuild the image just to change vessel.
+
+---
+
+## Status history behavior
+
+The `/status-texts` endpoint keeps a duplicate-free history of every unique upstream `status_text` this service has seen.
+
+That history is stored in:
+
+```text
+/data/status_text_history.json
+```
+
+Because the stack mounts `/data` as a Docker volume, the history survives container restarts and recreations.
 
 ---
 
@@ -339,6 +286,7 @@ With the default settings:
 - first request fetches fresh data
 - repeated requests within `120` seconds use cached data
 - first request after cache expiry fetches fresh data again
+- if upstream fetch fails but cached data exists, the app serves cached data with `stale: true`
 
 If Home Assistant is configured with:
 
@@ -360,7 +308,6 @@ Common causes:
 - port `8080` is already in use
 - the image could not be pulled
 - invalid YAML in the stack
-- the history file path is not writable
 
 ### `/healthz` works but `/status` fails
 
@@ -368,18 +315,13 @@ Check the container logs.
 Possible causes:
 
 - the upstream RS API is unavailable
-- the selected `VESSEL_MMSI`, `RS_ID`, or `RS_NAME` does not match a vessel
+- the selected `VESSEL_MMSI` does not match a vessel
 - outbound internet access from the container is blocked
 
-### `/status-texts` does not survive restarts
+### `/status-texts` is empty
 
-Make sure `/data` is persisted with a Docker volume or bind mount.
-The default Compose file already does this with:
-
-```yaml
-volumes:
-  - rs-status-data:/data
-```
+The service only learns status texts from live upstream responses.
+If it has not yet completed a successful fetch, the list may still be empty.
 
 ### Home Assistant cannot read the endpoint
 
@@ -404,7 +346,8 @@ For most users, setup is:
 1. Open Portainer
 2. Create a stack from the Web editor
 3. Paste the Compose file
-4. Set `VESSEL_MMSI`
+4. Keep `VESSEL_MMSI=257895900` for Anne-Lise, or replace it with another vessel MMSI
 5. Deploy the stack
 6. Point Home Assistant to `http://YOUR_CONTAINER_IP:8080/status`
-7. Use `http://YOUR_CONTAINER_IP:8080/status-texts` to see the growing duplicate-free status list
+
+That is all that is needed to use the image.
