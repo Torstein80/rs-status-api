@@ -1,0 +1,97 @@
+# Home Assistant REST sensor example for rs-status-api
+#
+# Option 1:
+#   Use /status and set MMSI, RS_ID, or RS_NAME in the container environment.
+#
+# Option 2:
+#   Pin a vessel directly in the URL, for example:
+#   resource: "http://YOUR-CONTAINER-IP:8080/status?mmsi=257895900"
+#
+# This example exposes the main vessel status as the sensor state and stores
+# the rest of the vessel data as attributes on the same entity.
+
+sensor:
+  - platform: rest
+    name: RS Vessel Status
+    unique_id: rs_vessel_status
+    resource: "http://YOUR-CONTAINER-IP:8080/status"
+    scan_interval: 120
+    timeout: 30
+    value_template: "{{ value_json.raw_status }}"
+    json_attributes:
+      - ok
+      - selector
+      - rs
+      - name
+      - mmsi
+      - callsign
+      - class
+      - vessel_type
+      - raw_status
+      - status
+      - status_id
+      - status_color
+      - status_reason
+      - status_note
+      - state
+      - state_description
+      - expected_back
+      - station
+      - station_code
+      - station_region
+      - station_type
+      - timestamp
+      - position_source
+      - latitude
+      - longitude
+      - decimal_latitude
+      - decimal_longitude
+      - image_url
+      - boats_source
+      - ais_source
+      - served_at
+      - stale
+      - upstream_error
+      - ais
+
+# Optional template sensors for commonly used values
+
+template:
+  - sensor:
+      - name: RS Vessel Name
+        unique_id: rs_vessel_name
+        state: "{{ state_attr('sensor.rs_vessel_status', 'name') }}"
+
+      - name: RS Vessel Station
+        unique_id: rs_vessel_station
+        state: "{{ state_attr('sensor.rs_vessel_status', 'station') }}"
+
+      - name: RS Vessel MMSI
+        unique_id: rs_vessel_mmsi
+        state: "{{ state_attr('sensor.rs_vessel_status', 'mmsi') }}"
+
+      - name: RS Vessel Position Source
+        unique_id: rs_vessel_position_source
+        state: "{{ state_attr('sensor.rs_vessel_status', 'position_source') }}"
+
+      - name: RS Vessel Latitude
+        unique_id: rs_vessel_latitude
+        state: "{{ state_attr('sensor.rs_vessel_status', 'decimal_latitude') }}"
+
+      - name: RS Vessel Longitude
+        unique_id: rs_vessel_longitude
+        state: "{{ state_attr('sensor.rs_vessel_status', 'decimal_longitude') }}"
+
+      - name: RS Vessel SOG
+        unique_id: rs_vessel_sog
+        unit_of_measurement: "kn"
+        state: "{{ state_attr('sensor.rs_vessel_status', 'ais').sog_knots if state_attr('sensor.rs_vessel_status', 'ais') else none }}"
+
+      - name: RS Vessel COG
+        unique_id: rs_vessel_cog
+        unit_of_measurement: "°"
+        state: "{{ state_attr('sensor.rs_vessel_status', 'ais').cog_degrees if state_attr('sensor.rs_vessel_status', 'ais') else none }}"
+
+      - name: RS Vessel Data Stale
+        unique_id: rs_vessel_data_stale
+        state: "{{ state_attr('sensor.rs_vessel_status', 'stale') }}"

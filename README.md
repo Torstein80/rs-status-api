@@ -55,7 +55,7 @@ You can choose the default vessel in Portainer by setting **one** of these envir
 
 Examples:
 
-- `MMSI=257895900`
+- `MMSI=257227000`
 - `RS_ID=127`
 - `RS_NAME=Anne-Lise`
 
@@ -69,13 +69,12 @@ Open these URLs in a browser or test them with `curl`:
 curl http://YOUR-CONTAINER-IP:8080/healthz
 curl http://YOUR-CONTAINER-IP:8080/vessels
 curl http://YOUR-CONTAINER-IP:8080/status
-curl "http://YOUR-CONTAINER-IP:8080/status?mmsi=257895900"
 ```
 
 If you did not set a default vessel, `/status` will return an error until you either:
 
 - set `MMSI`, `RS_ID`, or `RS_NAME` in Portainer, or
-- use a query parameter such as `?mmsi=257895900`
+- use a query parameter such as `?mmsi=257227000`
 
 ## How vessel selection works
 
@@ -98,7 +97,7 @@ This means:
 
 Example:
 
-- `GET /status?mmsi=257895900` returns that vessel for that request only
+- `GET /status?mmsi=257227000` returns that vessel for that request only
 - the next plain `GET /status` goes back to the environment variables
 
 ## Endpoints
@@ -144,9 +143,9 @@ Example response shape:
   "vessels": [
     {
       "rs": "127",
-      "name": "RS 127 \"Anne-Lise\"",
-      "mmsi": "257895900",
-      "station": "Lillesand",
+      "name": "Anne-Lise",
+      "mmsi": "257227000",
+      "station": "Some station",
       "ais_available_now": true
     }
   ]
@@ -160,7 +159,7 @@ Returns one selected vessel.
 Useful calls:
 
 - `/status`
-- `/status?mmsi=257895900`
+- `/status?mmsi=257227000`
 - `/status?rs=127`
 - `/status?name=Anne-Lise`
 
@@ -170,262 +169,66 @@ Possible results:
 - `400` when no selector was provided
 - `404` when a selector was provided but no vessel matched
 
-Example response:
+Typical fields in the response:
 
-```json
-{
-  "ok": true,
-  "selector": {
-    "mmsi": "257895900",
-    "rs": null,
-    "name": null,
-    "selected_by": "query",
-    "matched_on": "mmsi"
-  },
-  "rs": "127",
-  "name": "RS 127 \"Anne-Lise\"",
-  "mmsi": "257895900",
-  "callsign": "LF3933",
-  "class": "Simrad-klassen",
-  "vessel_type": "Sjøredningskorps",
-  "raw_status": "60 min beredskap",
-  "status": "Beredskap",
-  "status_id": 1,
-  "status_color": "#FF9933",
-  "status_reason": "Ingen årsak",
-  "status_note": null,
-  "state": "1",
-  "state_description": "Beredskap",
-  "expected_back": null,
-  "station": "Lillesand",
-  "station_code": "72",
-  "station_region": "Sørlandet",
-  "station_type": "RSRK",
-  "timestamp": "2026-04-14T21:30:30Z",
-  "position_source": "ais",
-  "latitude": "58° 14.84550",
-  "longitude": "8° 22.71222",
-  "decimal_latitude": 58.247425,
-  "decimal_longitude": 8.378537,
-  "image_url": "https://www.redningsselskapet.no/content/uploads/2019/02/RS127.jpg",
-  "boats_source": "https://prod-rsfeed-xml2json-proxy.rs-marine-services.rs.no/prefetch/getboats",
-  "ais_source": "https://ais.rs.no/aktive_pos.json",
-  "served_at": "2026-04-14T21:45:04.481220+00:00",
-  "stale": false,
-  "upstream_error": null,
-  "ais": {
-    "available_now": true,
-    "ship_name": "RS127 ANNE-LISE",
-    "destination": "N/A",
-    "time_stamp": "2026-04-14T21:30:30Z",
-    "sog_knots": 0,
-    "cog_degrees": 95,
-    "latitude": "58° 14.84550",
-    "longitude": "8° 22.71222",
-    "decimal_latitude": 58.247425,
-    "decimal_longitude": 8.378537
-  }
-}
-```
-
-## Home Assistant
-
-### Recommended setup
-
-The easiest way to expose **all data** from `/status` to Home Assistant is to create one REST sensor and store the full response as attributes.
-
-That gives you:
-
-- sensor state = normalized vessel status
-- all top-level fields from `/status` as sensor attributes
-- `selector` and `ais` included as nested attributes
-
-Paste this into `configuration.yaml`:
-
-```yaml
-sensor:
-  - platform: rest
-    name: "RS Vessel Status"
-    unique_id: rs_vessel_status
-    resource: "http://YOUR-CONTAINER-IP:8080/status"
-    scan_interval: 300
-    timeout: 30
-    value_template: "{{ value_json.status }}"
-    json_attributes:
-      - ok
-      - selector
-      - rs
-      - name
-      - mmsi
-      - callsign
-      - class
-      - vessel_type
-      - raw_status
-      - status
-      - status_id
-      - status_color
-      - status_reason
-      - status_note
-      - state
-      - state_description
-      - expected_back
-      - station
-      - station_code
-      - station_region
-      - station_type
-      - timestamp
-      - position_source
-      - latitude
-      - longitude
-      - decimal_latitude
-      - decimal_longitude
-      - image_url
-      - boats_source
-      - ais_source
-      - served_at
-      - stale
-      - upstream_error
-      - ais
-```
-
-If you do **not** want a default vessel in the container, point Home Assistant directly at one vessel instead:
-
-```yaml
-sensor:
-  - platform: rest
-    name: "RS Vessel Status"
-    unique_id: rs_vessel_status
-    resource: "http://YOUR-CONTAINER-IP:8080/status?mmsi=257895900"
-    scan_interval: 300
-    timeout: 30
-    value_template: "{{ value_json.status }}"
-    json_attributes:
-      - ok
-      - selector
-      - rs
-      - name
-      - mmsi
-      - callsign
-      - class
-      - vessel_type
-      - raw_status
-      - status
-      - status_id
-      - status_color
-      - status_reason
-      - status_note
-      - state
-      - state_description
-      - expected_back
-      - station
-      - station_code
-      - station_region
-      - station_type
-      - timestamp
-      - position_source
-      - latitude
-      - longitude
-      - decimal_latitude
-      - decimal_longitude
-      - image_url
-      - boats_source
-      - ais_source
-      - served_at
-      - stale
-      - upstream_error
-      - ais
-```
-
-### What you get in Home Assistant
-
-After adding the sensor above, these values are available as attributes on `sensor.rs_vessel_status`:
-
-- `rs`
-- `name`
-- `mmsi`
-- `callsign`
-- `class`
-- `vessel_type`
-- `raw_status`
 - `status`
+- `raw_status`
 - `status_id`
 - `status_color`
-- `status_reason`
-- `status_note`
-- `state`
-- `state_description`
-- `expected_back`
 - `station`
-- `station_code`
-- `station_region`
-- `station_type`
 - `timestamp`
-- `position_source`
-- `latitude`
-- `longitude`
-- `decimal_latitude`
-- `decimal_longitude`
-- `image_url`
-- `boats_source`
-- `ais_source`
-- `served_at`
+- `mmsi`
+- `selector`
 - `stale`
 - `upstream_error`
-- `selector`
-- `ais`
+- `ais.sog_knots`
+- `ais.cog_degrees`
 
-That means all the data from the JSON response is available in Home Assistant from one sensor.
+## Home Assistant and Node-RED examples
 
-### Optional: create separate Home Assistant sensors for common fields
+Ready-to-use examples are included in this repository.
 
-If you want some values as their own entities, add template sensors like this:
+Files:
 
-```yaml
-template:
-  - sensor:
-      - name: "RS Vessel Station"
-        unique_id: rs_vessel_station
-        state: "{{ state_attr('sensor.rs_vessel_status', 'station') }}"
+- [examples/home-assistant/rest-sensor.yaml](examples/home-assistant/rest-sensor.yaml)
+- [examples/node-red/rs-status-flow.json](examples/node-red/rs-status-flow.json)
+- [examples/node-red/README.md](examples/node-red/README.md)
 
-      - name: "RS Vessel MMSI"
-        unique_id: rs_vessel_mmsi
-        state: "{{ state_attr('sensor.rs_vessel_status', 'mmsi') }}"
+### Home Assistant
 
-      - name: "RS Vessel Latitude"
-        unique_id: rs_vessel_latitude
-        state: "{{ state_attr('sensor.rs_vessel_status', 'decimal_latitude') }}"
+Use the example in:
 
-      - name: "RS Vessel Longitude"
-        unique_id: rs_vessel_longitude
-        state: "{{ state_attr('sensor.rs_vessel_status', 'decimal_longitude') }}"
-
-      - name: "RS Vessel AIS SOG"
-        unique_id: rs_vessel_ais_sog
-        unit_of_measurement: "kn"
-        state: >
-          {% set ais = state_attr('sensor.rs_vessel_status', 'ais') %}
-          {{ ais.sog_knots if ais is mapping else none }}
-
-      - name: "RS Vessel AIS COG"
-        unique_id: rs_vessel_ais_cog
-        unit_of_measurement: "°"
-        state: >
-          {% set ais = state_attr('sensor.rs_vessel_status', 'ais') %}
-          {{ ais.cog_degrees if ais is mapping else none }}
-
-      - name: "RS Vessel Data Stale"
-        unique_id: rs_vessel_data_stale
-        state: "{{ state_attr('sensor.rs_vessel_status', 'stale') }}"
+```text
+examples/home-assistant/rest-sensor.yaml
 ```
 
-### Optional: picture card example
+It creates `sensor.rs_vessel_status`, stores the main vessel status as the entity state, and exposes the rest of the vessel data as attributes.
 
-If you want to show the vessel image on a dashboard, use the `image_url` attribute:
+### Node-RED
 
-```yaml
-type: picture
-image: "[[[ return states['sensor.rs_vessel_status'].attributes.image_url; ]]]"
+Import the example flow from:
+
+```text
+examples/node-red/rs-status-flow.json
 ```
+
+This example flow shows how to:
+
+- poll `sensor.rs_vessel_status`
+- inspect RS vessel fields in debug nodes
+- send mobile notifications only when vessel or `raw_status` changes
+- control Philips Hue scenes based on `raw_status`
+
+Import steps:
+
+1. Open Node-RED
+2. Open the menu in the top right
+3. Choose **Import**
+4. Paste or upload `examples/node-red/rs-status-flow.json`
+5. Select your Home Assistant server in the imported nodes
+6. Update the mobile notify service if needed
+7. Update the scene entity IDs if needed
+8. Deploy
 
 ## Notes
 
@@ -433,4 +236,3 @@ image: "[[[ return states['sensor.rs_vessel_status'].attributes.image_url; ]]]"
 - `/healthz` does not trigger a refresh
 - If the boat feed fails but cached data exists, cached data is returned with `stale: true`
 - If AIS fails, boat status can still be returned
-- If you want to find a vessel MMSI first, use `/vessels?only_with_mmsi=1`
